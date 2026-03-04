@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Umberto in Dublin - Mobile Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        body {
+            background-color: #111;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+            font-family: 'Press Start 2P', monospace;
+            overflow: hidden; /* Evita lo scroll su mobile */
+        }
+        
+        canvas {
+            background-color: #2e4c23;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            image-rendering: pixelated;
+            max-width: 100%;
+            max-height: 100vh;
+            object-fit: contain; /* Mantiene le proporzioni 800x600 */
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            font-family: sans-serif;
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            width: 100%;
+            pointer-events: none;
+        }
+
+        /* --- UI MOBILE --- */
+        #mobile-controls {
+            display: none; /* Nascosto su desktop */
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            padding: 0 20px;
+            box-sizing: border-box;
+            justify-content: space-between;
+            align-items: flex-end;
+            touch-action: manipulation; /* Migliora reattività touch */
+        }
+
+        .dpad {
+            display: grid;
+            grid-template-columns: 50px 50px 50px;
+            grid-template-rows: 50px 50px 50px;
+            gap: 5px;
+        }
+
+        .dpad-btn, .action-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            color: white;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .dpad-btn:active, .action-btn:active {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        #btn-up { grid-column: 2; grid-row: 1; }
+        #btn-left { grid-column: 1; grid-row: 2; }
+        #btn-right { grid-column: 3; grid-row: 2; }
+        #btn-down { grid-column: 2; grid-row: 3; }
+
+        .action-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+        }
+
+        /* Mostra i controlli touch solo su schermi piccoli (es. smartphone) */
+        @media (max-width: 850px) {
+            #mobile-controls {
+                display: flex;
+            }
+            #info {
+                display: none; /* Nascondi info tastiera su mobile */
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="info">Usa WASD / Frecce per muoverti. Premi SPAZIO per interagire.</div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<div id="mobile-controls">
+    <div class="dpad">
+        <div class="dpad-btn" id="btn-up">▲</div>
+        <div class="dpad-btn" id="btn-left">◀</div>
+        <div class="dpad-btn" id="btn-down">▼</div>
+        <div class="dpad-btn" id="btn-right">▶</div>
+    </div>
+    <div class="action-btn" id="btn-action">A</div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    // --- Audio Context per il suono sintetico ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = new AudioContext();
+
+    function playBeep() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(600 + Math.random() * 200, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.05);
+    }
+
+    // --- Stato di Gioco ---
+    let gameState = 'PLAY'; 
+    let identity = 0; 
+    const talkedTo = new Set();
+    let currentDialog = null;
+    let dialogChars = 0;
+
+    // --- Input (Tastiera + Touch) ---
+    const keys = {};
+
+    // Gestione Tastiera
+    window.addEventListener('keydown', e => {
+        keys[e.key.toLowerCase()] = true;
+        if (e.key === ' ') { e.preventDefault(); handleInteraction(); }
+    });
+    window.addEventListener('keyup', e => {
+        keys[e.key.toLowerCase()] = false;
+    });
+
+    // Gestione Touch
+    const bindTouch = (id, key, isAction = false) => {
+        const btn = document.getElementById(id);
+        
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Previene scroll e zoom
+            keys[key] = true;
+            if (isAction) handleInteraction();
+        });
+        
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys[key] = false;
+        });
+    };
+
+    bindTouch('btn-up', 'w');
+    bindTouch('btn-left', 'a');
+    bindTouch('btn-down', 's');
+    bindTouch('btn-right', 'd');
+    bindTouch('btn-action', ' ', true);
+
+    // --- Mappa e Ostacoli ---
+    const mapFeatures = {
+        grass: '#4c7c34',
+        roadH: { x: 0, y: 250, w: 800, h: 100, color: '#656d73' },
+        roadV: { x: 350, y: 0, w: 100, h: 600, color: '#656d73' }
+    };
+
+    const obstacles = [
+        { x: 50, y: 400, w: 250, h: 150, color: '#5c3a21', label: 'PUB' },
+        { x: 500, y: 50, w: 250, h: 150, color: '#2c3e50', label: 'COWORKING' },
+        { x: 50, y: 50, w: 60, h: 60, color: '#1b4d2e' },
+        { x: 150, y: 80, w: 60, h: 60, color: '#1b4d2e' },
+        { x: 80, y: 150, w: 60, h: 60, color: '#1b4d2e' }
+    ];
+
+    // --- Player ---
+    const player = {
+        x: 384, y: 284, size: 32, speed: 3.5, color: '#3498db', dirX: 0, dirY: 1
+    };
+
+    // --- NPCs ---
+    const npcs = [
+        { id: 1, name: "Liam", role: "Dev Espatriato", text: "Pensavo di venire qui per il lavoro. In realtà sono rimasto per la versione migliore di me.", x: 450, y: 120, color: '#e74c3c', imgUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() },
+        { id: 2, name: "Seamus", role: "Filosofo da Pub", text: "Puoi fare debug del codice, ma non puoi fare debug del destino.", x: 320, y: 450, color: '#f1c40f', imgUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() },
+        { id: 3, name: "Claire", role: "Recruiter Tech", text: "Dublino è piena di opportunità. Ma prima devi capire cosa vuoi davvero.", x: 384, y: 400, color: '#9b59b6', imgUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() },
+        { id: 4, name: "Old Patrick", role: "Irlandese Misterioso", text: "Non cercare te stesso. Costruisciti, riga dopo riga.", x: 220, y: 120, color: '#e67e22', imgUrl: 'https://images.unsplash.com/photo-1484688493527-670f98f9b195?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() }
+    ];
+    
+    npcs.forEach(npc => {
+        npc.img.crossOrigin = "Anonymous";
+        npc.img.src = npc.imgUrl;
+    });
+
+    // --- Pioggia ---
+    const drops = [];
+    for (let i = 0; i < 150; i++) {
+        drops.push({ x: Math.random() * 800, y: Math.random() * 600, s: 6 + Math.random() * 4, l: 10 + Math.random() * 15 });
+    }
+
+    // --- Logica Collisioni ---
+    function checkCollision(nx, ny, size) {
+        if (nx < 0 || ny < 0 || nx + size > canvas.width || ny + size > canvas.height) return true;
+        
+        for (let obs of obstacles) {
+            if (nx < obs.x + obs.w && nx + size > obs.x && ny < obs.y + obs.h && ny + size > obs.y) return true;
+        }
+        
+        for (let npc of npcs) {
+            if (nx < npc.x + 32 && nx + size > npc.x && ny < npc.y + 32 && ny + size > npc.y) return true;
+        }
+        return false;
+    }
+
+    // --- Logica Interazione ---
+    function handleInteraction() {
+        if (gameState === 'END') return;
+
+        if (gameState === 'PLAY') {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            let cx = player.x + player.size / 2;
+            let cy = player.y + player.size / 2;
+            
+            for (let npc of npcs) {
+                let ncx = npc.x + 16;
+                let ncy = npc.y + 16;
+                let dist = Math.hypot(cx - ncx, cy - ncy);
+                
+                if (dist < 55) {
+                    gameState = 'DIALOG';
+                    currentDialog = npc;
+                    dialogChars = 0;
+                    
+                    if (!talkedTo.has(npc.id)) {
+                        talkedTo.add(npc.id);
+                        identity = (talkedTo.size / npcs.length) * 100;
+                    }
+                    return;
+                }
+            }
+        } else if (gameState === 'DIALOG') {
+            if (dialogChars >= currentDialog.text.length) {
+                gameState = 'PLAY';
+                currentDialog = null;
+                if (identity >= 100) gameState = 'END';
+            } else {
+                dialogChars = currentDialog.text.length;
+            }
+        }
+    }
+
+    // --- Utility per Testo a capo ---
+    function wrapText(context, text, x, y, maxWidth, lineHeight) {
+        let words = text.split(' ');
+        let line = '';
+        for (let n = 0; n < words.length; n++) {
+            let testLine = line + words[n] + ' ';
+            let metrics = context.measureText(testLine);
+            if (metrics.width > maxWidth && n > 0) {
+                context.fillText(line, x, y);
+                line = words[n] + ' ';
+                y += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        context.fillText(line, x, y);
+    }
+
+    // --- Loop di Gioco ---
+    function update() {
+        if (gameState === 'PLAY') {
+            let dx = 0, dy = 0;
+            
+            if (keys['w'] || keys['arrowup']) dy = -player.speed;
+            if (keys['s'] || keys['arrowdown']) dy = player.speed;
+            if (keys['a'] || keys['arrowleft']) dx = -player.speed;
+            if (keys['d'] || keys['arrowright']) dx = player.speed;
+
+            if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
+
+            if (dx !== 0 || dy !== 0) {
+                player.dirX = dx > 0 ? 1 : (dx < 0 ? -1 : 0);
+                player.dirY = dy > 0 ? 1 : (dy < 0 ? -1 : 0);
+            }
+
+            if (dx !== 0) {
+                player.x += dx;
+                if (checkCollision(player.x, player.y, player.size)) player.x -= dx;
+            }
+            if (dy !== 0) {
+                player.y += dy;
+                if (checkCollision(player.x, player.y, player.size)) player.y -= dy;
+            }
+        }
+
+        if (gameState === 'DIALOG' && currentDialog) {
+            if (dialogChars < currentDialog.text.length) {
+                dialogChars += 0.5;
+                if (Math.floor(dialogChars) % 3 === 0) playBeep();
+            }
+        }
+    }
+
+    function drawSprite(x, y, color, isPlayer, pDirX=0, pDirY=1) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, 32, 32);
+        
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, 32, 32);
+
+        let eyeOffsetX = isPlayer ? pDirX * 4 : 0;
+        let eyeOffsetY = isPlayer ? pDirY * 4 : 0;
+        
+        ctx.fillStyle = 'white';
+        ctx.fillRect(x + 6 + eyeOffsetX, y + 8 + eyeOffsetY, 6, 6);
+        ctx.fillRect(x + 20 + eyeOffsetX, y + 8 + eyeOffsetY, 6, 6);
+        ctx.fillStyle = 'black';
+        ctx.fillRect(x + 8 + eyeOffsetX, y + 10 + eyeOffsetY, 2, 2);
+        ctx.fillRect(x + 22 + eyeOffsetX, y + 10 + eyeOffsetY, 2, 2);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = mapFeatures.grass;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = mapFeatures.roadH.color;
+        ctx.fillRect(mapFeatures.roadH.x, mapFeatures.roadH.y, mapFeatures.roadH.w, mapFeatures.roadH.h);
+        ctx.fillRect(mapFeatures.roadV.x, mapFeatures.roadV.y, mapFeatures.roadV.w, mapFeatures.roadV.h);
+
+        for (let obs of obstacles) {
+            ctx.fillStyle = obs.color;
+            ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.fillRect(obs.x, obs.y + obs.h - 10, obs.w, 10);
+            
+            if (obs.label) {
+                ctx.fillStyle = 'white';
+                ctx.font = '12px "Press Start 2P"';
+                ctx.fillText(obs.label, obs.x + 20, obs.y + 40);
+            }
+        }
+
+        for (let npc of npcs) {
+            drawSprite(npc.x, npc.y, npc.color, false);
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(npc.x + 16, npc.y + 34, 12, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        drawSprite(player.x, player.y, player.color, true, player.dirX, player.dirY);
+
+        ctx.strokeStyle = 'rgba(174, 194, 224, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let d of drops) {
+            ctx.moveTo(d.x, d.y);
+            ctx.lineTo(d.x - d.l * 0.2, d.y + d.l);
+            d.y += d.s;
+            d.x -= d.s * 0.2;
+            if (d.y > 600) { d.y = -20; d.x = Math.random() * 800; }
+        }
+        ctx.stroke();
+
+        ctx.fillStyle = 'white';
+        ctx.fillRect(20, 20, 204, 24);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(22, 22, 200, 20);
+        ctx.fillStyle = '#00ffcc';
+        ctx.fillRect(22, 22, (identity / 100) * 200, 20);
+        
+        ctx.fillStyle = 'white';
+        ctx.font = '10px "Press Start 2P"';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'black';
+        ctx.strokeText(`IDENTITA': ${Math.round(identity)}%`, 25, 60);
+        ctx.fillText(`IDENTITA': ${Math.round(identity)}%`, 25, 60);
+
+        if (gameState === 'DIALOG' && currentDialog) {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(40, 420, 720, 150);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(40, 420, 720, 150);
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(45, 425, 710, 140);
+
+            if (currentDialog.img.complete) {
+                ctx.drawImage(currentDialog.img, 60, 435, 120, 120);
+            } else {
+                ctx.fillStyle = '#333';
+                ctx.fillRect(60, 435, 120, 120);
+            }
+            ctx.strokeStyle = 'white';
+            ctx.strokeRect(60, 435, 120, 120);
+
+            ctx.fillStyle = '#f1c40f';
+            ctx.font = '14px "Press Start 2P"';
+            ctx.fillText(`${currentDialog.name} - ${currentDialog.role}`, 200, 460);
+
+            ctx.fillStyle = 'white';
+            ctx.font = '12px "Press Start 2P"';
+            let visibleText = currentDialog.text.substring(0, Math.floor(dialogChars));
+            wrapText(ctx, visibleText, 200, 500, 520, 22);
+
+            if (dialogChars >= currentDialog.text.length) {
+                ctx.fillStyle = (Date.now() % 1000 < 500) ? 'white' : 'transparent';
+                ctx.fillText("▼", 730, 550);
+            }
+        }
+
+        if (gameState === 'END') {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#00ffcc';
+            ctx.font = '22px "Press Start 2P"';
+            ctx.fillText("Self Discovery Unlocked", 400, 280);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '18px "Press Start 2P"';
+            ctx.fillText("- Umberto 2.0 -", 400, 340);
+            
+            ctx.textAlign = 'left';
+        }
+    }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    // Start
+    requestAnimationFrame(loop);
+</script>
+</body>
+</html>
