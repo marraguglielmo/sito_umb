@@ -41,7 +41,6 @@
             z-index: 10;
         }
 
-        /* --- CONTROLLI MOBILE --- */
         #mobile-controls {
             display: none;
             position: absolute;
@@ -69,6 +68,7 @@
             justify-content: center;
             align-items: center;
             user-select: none;
+            -webkit-user-select: none;
             backdrop-filter: blur(5px);
         }
 
@@ -109,7 +109,6 @@
     const MAP_HEIGHT = 1200;
     const camera = { x: 0, y: 0, w: canvas.width, h: canvas.height };
 
-    // Audio Minimal
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     let audioCtx = new AudioContext();
     function playStep() {
@@ -127,6 +126,8 @@
     const talkedTo = new Set();
     let currentDialog = null;
     let dialogChars = 0;
+    let endImageLoaded = false;
+    const endImage = new Image();
 
     const keys = {};
     window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if(e.key===' ') handleInteraction(); });
@@ -139,36 +140,41 @@
     };
     bindT('btn-up','w'); bindT('btn-left','a'); bindT('btn-down','s'); bindT('btn-right','d'); bindT('btn-action',' ',true);
 
-    // Mappa: Marciapiedi e Strade (Realistico)
     const roads = [
         { x: 0, y: 450, w: MAP_WIDTH, h: 100, color: '#3d3d3d' }, 
         { x: 700, y: 0, w: 120, h: MAP_HEIGHT, color: '#3d3d3d' }
     ];
 
     const obstacles = [
-        { x: 100, y: 100, w: 300, h: 220, color: '#5d3b2a', label: 'Clandestino 13', desc: 'Mattoni Scuri' },
-        { x: 850, y: 80, w: 220, h: 200, color: '#7a2d2d', label: 'Bar cappuccini', desc: 'Caffetteria' },
-        { x: 1250, y: 150, w: 280, h: 180, color: '#2d4a3e', label: 'Brujita', desc: 'Irish Pub' },
-        { x: 150, y: 700, w: 400, h: 250, color: '#4a4a4a', label: 'Biblioteca', desc: 'Pietra' },
-        { x: 1100, y: 750, w: 420, h: 300, color: '#2b3d52', label: 'Stadio san vito', desc: 'Cemento' },
-        { x: 750, y: 900, w: 250, h: 200, color: '#3e4a59', label: 'ecotekne', desc: 'Vetro/Acciaio' }
+        { x: 100, y: 100, w: 300, h: 220, color: '#5d3b2a', label: 'Clandestino 13' },
+        { x: 850, y: 80, w: 220, h: 200, color: '#7a2d2d', label: 'Bar cappuccini' },
+        { x: 1250, y: 150, w: 280, h: 180, color: '#2d4a3e', label: 'Brujita' },
+        { x: 150, y: 700, w: 400, h: 250, color: '#4a4a4a', label: 'Biblioteca' },
+        { x: 1100, y: 750, w: 420, h: 300, color: '#2b3d52', label: 'Stadio san vito' },
+        { x: 750, y: 900, w: 250, h: 200, color: '#3e4a59', label: 'ecotekne' }
     ];
 
-    // Personaggi (Stile Realistico)
     const player = { x: 740, y: 480, w: 32, h: 42, speed: 3.2, color: '#1a2a40', hair: '#4a4a4a', suitcase: '#3d2b1f' };
 
-    // === MODIFICA QUI ===
+    // === PERSONAGGI CON POSIZIONI CORRETTE ===
     const npcs = [
-        { id: 1, name: "Cece", role: "Amico", text: "Dublino ti cambierà, Umbe. Sii pronto a tutto. 🍀", x: 420, y: 350, color: '#4a5d23', imgUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() },
-        { id: 2, name: "Aniceto", role: "Mentore", text: "Non dimenticare le tue radici mentre cerchi nuove ali. ✈️", x: 830, y: 310, color: '#5d4a3a', imgUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() },
-        { id: 3, name: "Bubi", role: "Musicista", text: "La musica nei pub di Temple Bar è un'altra cosa. Divertiti! 🎸", x: 1200, y: 380, color: '#2a3d4a', imgUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() },
-        { id: 4, name: "Gugli", role: "Studente", text: "Portami un libro di Joyce, quello originale! 📚", x: 200, y: 620, color: '#4a2a2a', imgUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() },
-        { id: 5, name: "Ric", role: "Sportivo", text: "Vedi se riesci a beccare una partita di rugby allo stadio! 🏉", x: 1050, y: 700, color: '#2a4a2a', imgUrl: 'https://images.unsplash.com/photo-1530268729831-4b0b9e170218?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() },
-        { id: 6, name: "Pietro", role: "Collega", text: "I dati dicono che farai grandi cose là. Buona fortuna! 💻", x: 710, y: 850, color: '#3d3d3d', imgUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() }
+        // Cece: all'aperto, a sinistra del Clandestino 13
+        { id: 1, name: "Cece", role: "Cece", text: "Dublino ti cambierà, Umbe. Sii pronto a tutto. 🍀", x: 420, y: 350, color: '#4a5d23', imgUrl: 'assets/img/cece.jpeg', img: new Image() },
+        // Aniceto: all'aperto, a destra del Clandestino 13
+        { id: 2, name: "Aniceto", role: "Rachitico", text: "Ancora quai stai?? Essi o te scannu.", x: 650, y: 310, color: '#5d4a3a', imgUrl: 'assets/img/aniceto.jpeg', img: new Image() },
+        // Bubi: all'aperto, vicino all'ingresso del Brujita
+        { id: 3, name: "Bubi", role: "Chill guy", text: "Come sta Asia? ….va mori …ammazzati ...sei un pagliaccio ... non ti vergnogni?", x: 1210, y: 350, color: '#2a3d4a', imgUrl: 'assets/img/bubi.jpg', img: new Image() },
+        // Gugli: all'aperto, a destra della Biblioteca
+        { id: 4, name: "Gugli", role: "Quasi pelato", text: "Mercoledì in pist... ah no, va fatica.", x: 570, y: 720, color: '#4a2a2a', imgUrl: 'assets/img/gugli.jpg', img: new Image() },
+        // Ric: all'aperto, a sinistra dello Stadio san vito
+        { id: 5, name: "Ric", role: "Stempiato", text: "Ti aspetto per l’ironman! 😉💪🏽 #HybridAthlete #NoPainNoGain #StayHard #YouVsYou", x: 1040, y: 800, color: '#2a4a2a', imgUrl: 'https://images.unsplash.com/photo-1530268729831-4b0b9e170218?auto=format&fit=crop&w=120&h=120&q=80', img: new Image() },
+        // Pietro: all'aperto, sulla strada grigia verticale, vicino a Ekotekne
+        { id: 6, name: "Pietro", role: "Pelato", text: "I dati dicono che farai grandi cose là. Buona fortuna! 💻", x: 640, y: 920, color: '#3d3d3d', imgUrl: 'assets/img/pietro.jpeg', img: new Image() },
+        // Trande: all'aperto, a destra di Ekotekne
+        { id: 7, name: "Trande", role: "Scasciatu", text: "Sirda tene puru fii normali?", x: 1030, y: 950, color: '#1a3c34', imgUrl: 'assets/img/tonio.jpeg', img: new Image() }
     ];
     npcs.forEach(n => { n.img.crossOrigin="Anonymous"; n.img.src=n.imgUrl; });
 
-    // Pioggia Sottile
     const rain = [];
     for(let i=0; i<400; i++) rain.push({ x: Math.random()*MAP_WIDTH, y: Math.random()*MAP_HEIGHT, v: 8+Math.random()*4 });
 
@@ -183,7 +189,7 @@
         if (gameState === 'DIALOG') {
             if (dialogChars >= currentDialog.text.length) { 
                 gameState = 'PLAY'; 
-                if (identity >= 100) gameState = 'END';
+                if (identity >= 100) handleGameCompletion();
             } else dialogChars = currentDialog.text.length;
             return;
         }
@@ -194,6 +200,15 @@
                 if (!talkedTo.has(n.id)) { talkedTo.add(n.id); identity = (talkedTo.size/npcs.length)*100; }
             }
         });
+    }
+
+    // === GESTIONE FINE GIOCO CON IMMAGINE ===
+    function handleGameCompletion() {
+        gameState = 'END';
+        // Puoi cambiare questa immagine con una tua foto di Dublino
+        endImage.src = 'assets/img/umb.png';
+        endImage.crossOrigin = "Anonymous";
+        endImage.onload = () => { endImageLoaded = true; };
     }
 
     function update() {
@@ -214,85 +229,95 @@
             camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - camera.w));
             camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - camera.h));
         }
-        if (gameState === 'DIALOG' && dialogChars < currentDialog.text.length) dialogChars += 0.7;
+        if (gameState === 'DIALOG' && dialogChars < currentDialog.text.length) dialogChars += 0.8;
     }
 
     function drawChar(x, y, color, hair, suitcase, isPlayer) {
-        // Ombra terra
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
         ctx.beginPath(); ctx.ellipse(x+16, y+40, 12, 4, 0, 0, Math.PI*2); ctx.fill();
-        // Gambe
         ctx.fillStyle = '#222'; ctx.fillRect(x+8, y+30, 6, 12); ctx.fillRect(x+18, y+30, 6, 12);
-        // Busto (Cappotto)
         ctx.fillStyle = color; ctx.fillRect(x+4, y+12, 24, 22);
-        // Testa
         ctx.fillStyle = '#efd0b1'; ctx.fillRect(x+8, y, 16, 16);
-        // Capelli
         ctx.fillStyle = hair; ctx.fillRect(x+8, y, 16, 4);
-        // Valigia
         if(isPlayer) { ctx.fillStyle = suitcase; ctx.fillRect(x+26, y+24, 10, 14); ctx.fillStyle='#111'; ctx.fillRect(x+28, y+22, 6, 2); }
-        // Occhi
         ctx.fillStyle = '#333'; ctx.fillRect(x+10, y+6, 3, 3); ctx.fillRect(x+19, y+6, 3, 3);
     }
 
     function draw() {
         ctx.clearRect(0,0,canvas.width,canvas.height);
-        ctx.save(); ctx.translate(-camera.x, -camera.y);
+        
+        // Disegna la mappa solo se non siamo nella schermata finale
+        if (gameState !== 'END') {
+            ctx.save(); ctx.translate(-camera.x, -camera.y);
 
-        // Terreno (Pietra)
-        ctx.fillStyle = '#2a2a2a'; ctx.fillRect(0,0,MAP_WIDTH,MAP_HEIGHT);
-        ctx.strokeStyle = '#333'; ctx.lineWidth=1;
-        for(let i=0; i<MAP_WIDTH; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,MAP_HEIGHT); ctx.stroke(); }
+            ctx.fillStyle = '#2a2a2a'; ctx.fillRect(0,0,MAP_WIDTH,MAP_HEIGHT);
+            ctx.strokeStyle = '#333'; ctx.lineWidth=1;
+            for(let i=0; i<MAP_WIDTH; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,MAP_HEIGHT); ctx.stroke(); }
 
-        // Strade
-        roads.forEach(r => { ctx.fillStyle=r.color; ctx.fillRect(r.x,r.y,r.w,r.h); });
+            roads.forEach(r => { ctx.fillStyle=r.color; ctx.fillRect(r.x,r.y,r.w,r.h); });
 
-        // Edifici
-        obstacles.forEach(o => {
-            ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, o.w, o.h);
-            ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(o.x, o.y+o.h-10, o.w, 10);
-            ctx.fillStyle = '#fff'; ctx.font = '10px "Press Start 2P"';
-            ctx.fillText(o.label, o.x+15, o.y+30);
-        });
-
-        npcs.forEach(n => drawChar(n.x, n.y, n.color, '#333', '', false));
-        drawChar(player.x, player.y, player.color, player.hair, player.suitcase, true);
-
-        // Pioggia
-        ctx.strokeStyle = 'rgba(200,200,255,0.2)'; ctx.lineWidth=1;
-        rain.forEach(r => {
-            ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x-1, r.y+5); ctx.stroke();
-            r.y += r.v; r.x -= 0.5;
-            if(r.y > MAP_HEIGHT) { r.y = -10; r.x = Math.random()*MAP_WIDTH; }
-        });
-
-        ctx.restore();
-
-        // UI Barra Identità (Minimal)
-        ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(20, 20, 200, 4);
-        ctx.fillStyle = '#fff'; ctx.fillRect(20, 20, (identity/100)*200, 4);
-        ctx.font = '8px "Press Start 2P"'; ctx.fillText(`Identità: ${Math.round(identity)}%`, 20, 40);
-
-        if (gameState === 'DIALOG') {
-            ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(50, 430, 700, 140);
-            ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.strokeRect(50, 430, 700, 140);
-            if(currentDialog.img.complete) ctx.drawImage(currentDialog.img, 70, 450, 100, 100);
-            ctx.fillStyle = '#aaa'; ctx.font = '10px "Press Start 2P"'; ctx.fillText(currentDialog.name, 190, 465);
-            ctx.fillStyle = '#fff'; ctx.font = '12px "Press Start 2P"';
-            let txt = currentDialog.text.substring(0, Math.floor(dialogChars));
-            let words = txt.split(' '); let line = ''; let yy = 500;
-            words.forEach(w => {
-                if((line + w).length > 35) { ctx.fillText(line, 190, yy); line = w + ' '; yy+=20; }
-                else line += w + ' ';
+            obstacles.forEach(o => {
+                ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, o.w, o.h);
+                ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(o.x, o.y+o.h-10, o.w, 10);
+                ctx.fillStyle = '#fff'; ctx.font = '10px "Press Start 2P"';
+                ctx.fillText(o.label, o.x+15, o.y+30);
             });
-            ctx.fillText(line, 190, yy);
-        }
 
-        if (gameState === 'END') {
-            ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(0,0,800,600);
-            ctx.textAlign='center'; ctx.fillStyle='#fff';
-            ctx.font='18px "Press Start 2P"'; ctx.fillText("Pronto per Dublino", 400, 280);
-            ctx.font='12px "Press Start 2P"'; ctx.fillText("Il viaggio di Umberto inizia ora.", 400, 330);
+            npcs.forEach(n => drawChar(n.x, n.y, n.color, '#333', '', false));
+            drawChar(player.x, player.y, player.color, player.hair, player.suitcase, true);
+
+            ctx.strokeStyle = 'rgba(200,200,255,0.2)'; ctx.lineWidth=1;
+            rain.forEach(r => {
+                ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x-1, r.y+5); ctx.stroke();
+                r.y += r.v; r.x -= 0.5;
+                if(r.y > MAP_HEIGHT) { r.y = -10; r.x = Math.random()*MAP_WIDTH; }
+            });
+
+            ctx.restore();
+
+            // UI Barra Identità
+            ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(20, 20, 200, 4);
+            ctx.fillStyle = '#fff'; ctx.fillRect(20, 20, (identity/100)*200, 4);
+            ctx.font = '8px "Press Start 2P"'; ctx.fillText(`Identità: ${Math.round(identity)}%`, 20, 40);
+
+            // UI Finestra di Dialogo
+            if (gameState === 'DIALOG') {
+                ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(50, 430, 700, 140);
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.strokeRect(50, 430, 700, 140);
+                if(currentDialog.img.complete) ctx.drawImage(currentDialog.img, 70, 450, 100, 100);
+                ctx.fillStyle = '#aaa'; ctx.font = '10px "Press Start 2P"'; ctx.fillText(currentDialog.name + " (" + currentDialog.role + ")", 190, 465);
+                ctx.fillStyle = '#fff'; ctx.font = '11px "Press Start 2P"';
+                let txt = currentDialog.text.substring(0, Math.floor(dialogChars));
+                let words = txt.split(' '); let line = ''; let yy = 500;
+                words.forEach(w => {
+                    if((line + w).length > 30) { ctx.fillText(line, 190, yy); line = w + ' '; yy+=20; }
+                    else line += w + ' ';
+                });
+                ctx.fillText(line, 190, yy);
+            }
+        } else {
+            // == SCHERMATA FINALE CON IMMAGINE ED EFFETTI ==
+            ctx.fillStyle = '#111'; ctx.fillRect(0,0,800,600);
+            
+            if (endImageLoaded) {
+                // Cornice ottone per l'immagine
+                ctx.strokeStyle = '#c5a059'; ctx.lineWidth = 6;
+                ctx.strokeRect(100, 80, 600, 400);
+                ctx.drawImage(endImage, 100, 80, 600, 400);
+            }
+
+            ctx.textAlign='center';
+            // Ombra testo
+            ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.font='22px "Press Start 2P"';
+            ctx.fillText("Alla fine l'ha fatta cu te laurei ah...", 402, 532);
+            // Testo principale
+            ctx.fillStyle='#fff'; ctx.font='22px "Press Start 2P"';
+            ctx.fillText("Alla fine l'ha fatta cu te laurei ah...", 400, 530);
+            
+            ctx.fillStyle='#aaa'; ctx.font='12px "Press Start 2P"';
+            ctx.fillText("Se campamu non accetta falliti, quindi torna fallito ☘️✈️", 400, 570);
+            
+            ctx.textAlign='left'; // Reset
         }
     }
 
