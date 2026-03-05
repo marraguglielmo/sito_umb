@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Umberto: Dublin Bound</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -13,15 +13,12 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            /* Usiamo min-height per evitare problemi con le barre dei browser */
             height: 100vh;
             margin: 0;
             color: #e0e0e0;
             font-family: 'Press Start 2P', monospace, sans-serif;
             overflow: hidden;
-            /* Impedisce il trascinamento della pagina su iOS */
-            position: fixed;
-            width: 100%;
+            /* Impedisce lo scroll accidentale su mobile */
             touch-action: none;
         }
         
@@ -30,65 +27,60 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             image-rendering: pixelated;
             max-width: 100%;
-            max-height: 70vh; /* Lasciamo spazio per i controlli */
+            max-height: 100vh;
             object-fit: contain;
             border-radius: 4px;
         }
 
         #info {
             position: absolute;
-            top: 10px;
-            font-size: 8px;
+            top: 15px;
+            font-family: sans-serif;
+            font-size: 11px;
+            letter-spacing: 1px;
             color: #666;
-            text-align: center;
-            width: 100%;
+            text-transform: uppercase;
             z-index: 10;
         }
 
         #mobile-controls {
             display: none;
+            position: absolute;
+            bottom: 30px;
             width: 100%;
-            max-width: 500px;
-            padding: 10px 20px;
+            padding: 0 25px;
             box-sizing: border-box;
             justify-content: space-between;
-            align-items: center;
-            z-index: 20;
+            z-index: 10;
         }
 
         .dpad {
             display: grid;
-            grid-template-columns: repeat(3, 55px);
-            grid-template-rows: repeat(3, 55px);
-            gap: 5px;
+            grid-template-columns: repeat(3, 50px);
+            grid-template-rows: repeat(3, 50px);
+            gap: 10px;
         }
 
         .dpad-btn, .action-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
             color: white;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 20px;
-            /* Evita lo zoom al tocco e la selezione testo */
             user-select: none;
             -webkit-user-select: none;
+            backdrop-filter: blur(5px);
             -webkit-tap-highlight-color: transparent;
         }
 
         .action-btn {
-            width: 90px;
-            height: 90px;
+            width: 80px;
+            height: 80px;
             border-radius: 50%;
-            font-size: 12px;
-            background: rgba(255, 255, 255, 0.15);
-        }
-
-        /* Attivazione tasti visiva */
-        .dpad-btn:active, .action-btn:active {
-            background: rgba(255, 255, 255, 0.4);
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.1);
         }
 
         @media (max-width: 850px) {
@@ -97,9 +89,9 @@
         }
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body onclick="startAudio()">
 
-<div id="info">Usa WASD per muoverti - Spazio per parlare</div>
+<div id="info">Tocca per iniziare e usa WASD o Frecce per muoverti</div>
 <canvas id="gameCanvas" width="800" height="600"></canvas>
 
 <div id="mobile-controls">
@@ -116,55 +108,23 @@
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
 
-    // AUDIO SYSTEM CON FALLBACK
+    // AUDIO SYSTEM
     let bgMusic = new Audio('assets/audio/umb_gay.mp3');
     bgMusic.loop = true;
     let audioStarted = false;
 
     function startAudio() {
         if (!audioStarted) {
-            bgMusic.play().then(() => {
-                audioStarted = true;
-            }).catch(e => console.log("Audio ancora bloccato"));
+            bgMusic.play().catch(e => console.log("Audio in attesa di interazione"));
+            audioStarted = true;
+            document.getElementById('info').innerText = "Esplora la città prima della partenza";
         }
     }
 
-    // GESTIONE INPUT MOBILE MIGLIORATA
-    const keys = {};
-    const bindT = (id, k, isAction = false) => {
-        const b = document.getElementById(id);
-        
-        const start = (e) => {
-            e.preventDefault();
-            startAudio();
-            keys[k] = true;
-            if (isAction) handleInteraction();
-        };
-        
-        const end = (e) => {
-            e.preventDefault();
-            keys[k] = false;
-        };
-
-        // passive: false è CRUCIALE per bloccare lo scroll della pagina
-        b.addEventListener('touchstart', start, {passive: false});
-        b.addEventListener('touchend', end, {passive: false});
-        b.addEventListener('touchcancel', end, {passive: false});
-    };
-
-    bindT('btn-up','w'); bindT('btn-left','a'); bindT('btn-down','s'); bindT('btn-right','d'); bindT('btn-action',' ', true);
-
-    // Eventi tastiera standard
-    window.addEventListener('keydown', e => { 
-        keys[e.key.toLowerCase()] = true; 
-        if(e.key === ' ') { e.preventDefault(); handleInteraction(); } 
-    });
-    window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-
-    // --- LOGICA GIOCO (Invariata ma pulita) ---
     const MAP_WIDTH = 1600;
     const MAP_HEIGHT = 1200;
     const camera = { x: 0, y: 0, w: canvas.width, h: canvas.height };
+
     let gameState = 'PLAY'; 
     let identity = 0; 
     const talkedTo = new Set();
@@ -188,6 +148,30 @@
         ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
     }
 
+    const keys = {};
+    window.addEventListener('keydown', e => { 
+        keys[e.key.toLowerCase()] = true; 
+        if(e.key===' ') { e.preventDefault(); handleInteraction(); } 
+    });
+    window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+    const bindT = (id, k, act=false) => {
+        const b = document.getElementById(id);
+        b.addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            startAudio(); 
+            keys[k]=true; 
+            if(act) handleInteraction(); 
+        });
+        b.addEventListener('touchend', (e) => { e.preventDefault(); keys[k]=false; });
+    };
+    bindT('btn-up','w'); bindT('btn-left','a'); bindT('btn-down','s'); bindT('btn-right','d'); bindT('btn-action',' ',true);
+
+    const roads = [
+        { x: 0, y: 450, w: MAP_WIDTH, h: 100, color: '#3d3d3d' }, 
+        { x: 700, y: 0, w: 120, h: MAP_HEIGHT, color: '#3d3d3d' }
+    ];
+
     const obstacles = [
         { x: 100, y: 100, w: 300, h: 220, color: '#5d3b2a', label: 'Clandestino 13' },
         { x: 850, y: 80, w: 220, h: 200, color: '#7a2d2d', label: 'Bar cappuccini' },
@@ -208,10 +192,10 @@
         { id: 6, name: "Pietro", role: "Pelato", text: "Meh? Quanti esami ti mancano?", x: 640, y: 920, color: '#3d3d3d', imgUrl: 'assets/img/pietro.jpeg', img: new Image() },
         { id: 7, name: "Trande", role: "Scasciatu", text: "Sirda tene puru fii normali?", x: 1030, y: 950, color: '#1a3c34', imgUrl: 'assets/img/tonio.jpeg', img: new Image() }
     ];
-    npcs.forEach(n => { n.img.src = n.imgUrl; });
+    npcs.forEach(n => { n.img.src=n.imgUrl; });
 
     const rain = [];
-    for(let i=0; i<150; i++) rain.push({ x: Math.random()*MAP_WIDTH, y: Math.random()*MAP_HEIGHT, v: 8+Math.random()*4 });
+    for(let i=0; i<200; i++) rain.push({ x: Math.random()*MAP_WIDTH, y: Math.random()*MAP_HEIGHT, v: 8+Math.random()*4 });
 
     function checkCollision(nx, ny) {
         if (nx < 0 || ny < 0 || nx + 32 > MAP_WIDTH || ny + 42 > MAP_HEIGHT) return true;
@@ -221,16 +205,17 @@
     }
 
     function handleInteraction() {
+        startAudio(); 
         if (gameState === 'DIALOG') {
             if (dialogChars >= currentDialog.text.length) { 
                 gameState = 'PLAY'; 
-                if (identity >= 100) handleGameCompletion();
+                if (talkedTo.size >= npcs.length) handleGameCompletion();
             } else dialogChars = currentDialog.text.length;
             return;
         }
         npcs.forEach(n => {
             let d = Math.hypot(player.x - n.x, player.y - n.y);
-            if (d < 60) {
+            if (d < 65) { // Range aumentato per facilità mobile
                 gameState = 'DIALOG'; currentDialog = n; dialogChars = 0;
                 if (!talkedTo.has(n.id)) { talkedTo.add(n.id); identity = (talkedTo.size/npcs.length)*100; }
             }
@@ -246,10 +231,10 @@
     function update() {
         if (gameState === 'PLAY') {
             let dx=0, dy=0;
-            if (keys['w']) dy = -player.speed;
-            if (keys['s']) dy = player.speed;
-            if (keys['a']) dx = -player.speed;
-            if (keys['d']) dx = player.speed;
+            if (keys['w']||keys['arrowup']) dy = -player.speed;
+            if (keys['s']||keys['arrowdown']) dy = player.speed;
+            if (keys['a']||keys['arrowleft']) dx = -player.speed;
+            if (keys['d']||keys['arrowright']) dx = player.speed;
             
             if(dx!==0 || dy!==0) {
                 if(!checkCollision(player.x + dx, player.y)) player.x += dx;
@@ -279,15 +264,16 @@
         
         if (gameState !== 'END') {
             ctx.save(); ctx.translate(-camera.x, -camera.y);
+
             ctx.fillStyle = '#2a2a2a'; ctx.fillRect(0,0,MAP_WIDTH,MAP_HEIGHT);
-            
-            // Strade
-            ctx.fillStyle = '#3d3d3d';
-            ctx.fillRect(0, 450, MAP_WIDTH, 100);
-            ctx.fillRect(700, 0, 120, MAP_HEIGHT);
+            ctx.strokeStyle = '#333'; ctx.lineWidth=1;
+            for(let i=0; i<MAP_WIDTH; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,MAP_HEIGHT); ctx.stroke(); }
+
+            roads.forEach(r => { ctx.fillStyle=r.color; ctx.fillRect(r.x,r.y,r.w,r.h); });
 
             obstacles.forEach(o => {
                 ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, o.w, o.h);
+                ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(o.x, o.y+o.h-10, o.w, 10);
                 ctx.fillStyle = '#fff'; ctx.font = '10px "Press Start 2P"';
                 ctx.fillText(o.label, o.x+15, o.y+30);
             });
@@ -295,50 +281,70 @@
             npcs.forEach(n => drawChar(n.x, n.y, n.color, '#333', '', false));
             drawChar(player.x, player.y, player.color, player.hair, player.suitcase, true);
 
-            ctx.strokeStyle = 'rgba(200,200,255,0.2)';
+            ctx.strokeStyle = 'rgba(200,200,255,0.2)'; ctx.lineWidth=1;
             rain.forEach(r => {
                 ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x-1, r.y+5); ctx.stroke();
-                r.y += r.v; if(r.y > MAP_HEIGHT) r.y = -10;
+                r.y += r.v; r.x -= 0.5;
+                if(r.y > MAP_HEIGHT) { r.y = -10; r.x = Math.random()*MAP_WIDTH; }
             });
+
             ctx.restore();
 
-            // Progress Bar
+            // UI BARRA
             ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(20, 20, 200, 6);
             ctx.fillStyle = '#fff'; ctx.fillRect(20, 20, (identity/100)*200, 6);
+            ctx.font = '8px "Press Start 2P"'; ctx.fillText(`Progressi: ${Math.round(identity)}%`, 20, 42);
 
+            // DIALOGHI - LOGICA WRAP SICURA PER MOBILE
             if (gameState === 'DIALOG') {
-                ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(50, 400, 700, 180);
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(50, 400, 700, 180);
-                if(currentDialog.img.complete) drawImageCover(ctx, currentDialog.img, 70, 420, 120, 120);
+                ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(50, 410, 700, 160);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(50, 410, 700, 160);
+                
+                if(currentDialog.img.complete) drawImageCover(ctx, currentDialog.img, 70, 430, 120, 120);
+                
                 ctx.fillStyle = '#aaa'; ctx.font = '10px "Press Start 2P"'; 
-                ctx.fillText(currentDialog.name, 210, 430);
+                ctx.fillText(currentDialog.name + " (" + currentDialog.role + ")", 210, 440);
+                
                 ctx.fillStyle = '#fff'; ctx.font = '11px "Press Start 2P"';
-                let txt = currentDialog.text.substring(0, Math.floor(dialogChars));
-                let lines = txt.split('\n');
-                let yy = 460;
-                lines.forEach(l => {
-                    let words = l.split(' '); let row = '';
-                    words.forEach(w => {
-                        if((row + w).length > 28) { ctx.fillText(row, 210, yy); row = w + ' '; yy+=25; }
-                        else row += w + ' ';
-                    });
-                    ctx.fillText(row, 210, yy); yy+=25;
+                
+                // --- NUOVA LOGICA DI WRAP SICURA ---
+                let fullTxt = currentDialog.text.substring(0, Math.floor(dialogChars));
+                let paragraphs = fullTxt.split('\n');
+                let yy = 475;
+                const maxLineW = 26; // Caratteri per riga sicuri
+
+                paragraphs.forEach(p => {
+                    let words = p.split(' ');
+                    let line = '';
+                    for(let i=0; i<words.length; i++) {
+                        let testLine = line + words[i] + ' ';
+                        if (testLine.length > maxLineW && i > 0) {
+                            ctx.fillText(line, 210, yy);
+                            line = words[i] + ' ';
+                            yy += 22;
+                        } else {
+                            line = testLine;
+                        }
+                    }
+                    ctx.fillText(line, 210, yy);
+                    yy += 22;
                 });
             }
         } else {
-            // FINALE
+            // SCHERMATA FINALE
             ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0,0,800,600);
             if (endImageLoaded) {
                 ctx.strokeStyle = '#c5a059'; ctx.lineWidth = 4;
-                ctx.strokeRect(250, 50, 300, 300);
-                drawImageCover(ctx, endImage, 250, 50, 300, 300);
+                ctx.strokeRect(200, 50, 400, 350);
+                drawImageCover(ctx, endImage, 200, 50, 400, 350);
             }
             ctx.textAlign='center';
-            ctx.fillStyle='#fff'; ctx.font='14px "Press Start 2P"';
-            ctx.fillText("Alla fine l'ha fatta cu te laurei ah...", 400, 420);
+            ctx.fillStyle='#fff'; ctx.font='16px "Press Start 2P"';
+            ctx.fillText("Alla fine l'ha fatta", 400, 440);
+            ctx.fillText("cu te laurei ah...", 400, 470);
             ctx.fillStyle='#c5a059'; ctx.font='10px "Press Start 2P"';
-            ctx.fillText("Se campamu non accetta falliti,", 400, 480);
-            ctx.fillText("quindi torna fallito ☘️✈️", 400, 510);
+            ctx.fillText("Se campamu non accetta falliti,", 400, 520);
+            ctx.fillText("quindi torna fallito ☘️✈️", 400, 545);
             ctx.textAlign='left';
         }
     }
