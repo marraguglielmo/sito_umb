@@ -86,9 +86,9 @@
         }
     </style>
 </head>
-<body>
+<body onclick="startAudio()">
 
-<div id="info">Esplora la città prima della partenza</div>
+<div id="info">Tocca per iniziare e usa WASD o Frecce per muoverti</div>
 <canvas id="gameCanvas" width="800" height="600"></canvas>
 
 <div id="mobile-controls">
@@ -105,21 +105,22 @@
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
 
+    // AUDIO SYSTEM
+    let bgMusic = new Audio('assets/audio/umb_gay.mp3');
+    bgMusic.loop = true;
+    let audioStarted = false;
+
+    function startAudio() {
+        if (!audioStarted) {
+            bgMusic.play().catch(e => console.log("Audio in attesa di interazione"));
+            audioStarted = true;
+            document.getElementById('info').innerText = "Esplora la città prima della partenza";
+        }
+    }
+
     const MAP_WIDTH = 1600;
     const MAP_HEIGHT = 1200;
     const camera = { x: 0, y: 0, w: canvas.width, h: canvas.height };
-
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    let audioCtx = new AudioContext();
-    function playStep() {
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.005, audioCtx.currentTime);
-        osc.connect(gain); gain.connect(audioCtx.destination);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.02);
-    }
 
     let gameState = 'PLAY'; 
     let identity = 0; 
@@ -128,6 +129,27 @@
     let dialogChars = 0;
     let endImageLoaded = false;
     const endImage = new Image();
+
+    // Helper per ridimensionare le immagini stile "cover"
+    function drawImageCover(ctx, img, x, y, w, h) {
+        if (!img.complete) return;
+        const imgRatio = img.width / img.height;
+        const targetRatio = w / h;
+        let sw, sh, sx, sy;
+
+        if (imgRatio > targetRatio) {
+            sh = img.height;
+            sw = img.height * targetRatio;
+            sx = (img.width - sw) / 2;
+            sy = 0;
+        } else {
+            sw = img.width;
+            sh = img.width / targetRatio;
+            sx = 0;
+            sy = (img.height - sh) / 2;
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+    }
 
     const keys = {};
     window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if(e.key===' ') handleInteraction(); });
@@ -154,26 +176,18 @@
         { x: 750, y: 900, w: 250, h: 200, color: '#3e4a59', label: 'ecotekne' }
     ];
 
-    const player = { x: 740, y: 480, w: 32, h: 42, speed: 3.2, color: '#1a2a40', hair: '#4a4a4a', suitcase: '#3d2b1f' };
+    const player = { x: 740, y: 480, w: 32, h: 42, speed: 3.5, color: '#1a2a40', hair: '#4a4a4a', suitcase: '#3d2b1f' };
 
-    // === PERSONAGGI CON POSIZIONI CORRETTE ===
     const npcs = [
-        // Cece: all'aperto, a sinistra del Clandestino 13
         { id: 1, name: "Cece", role: "Cece", text: "Dovevi aspettarmi bastardo.", x: 420, y: 350, color: '#4a5d23', imgUrl: 'assets/img/cece.jpeg', img: new Image() },
-        // Aniceto: all'aperto, a destra del Clandestino 13
         { id: 2, name: "Aniceto", role: "Rachitico", text: "Ancora quai stai?? Essi o te scannu.", x: 650, y: 310, color: '#5d4a3a', imgUrl: 'assets/img/aniceto.jpeg', img: new Image() },
-        // Bubi: all'aperto, vicino all'ingresso del Brujita
         { id: 3, name: "Bubi", role: "Chill guy", text: "Come sta Asia? ….va mori …ammazzati ...sei un pagliaccio ... non ti vergnogni?", x: 1210, y: 350, color: '#2a3d4a', imgUrl: 'assets/img/bubi.jpg', img: new Image() },
-        // Gugli: all'aperto, a destra della Biblioteca
         { id: 4, name: "Gugli", role: "Quasi pelato", text: "Mercoledì in pist... ah no, va fatica.", x: 570, y: 720, color: '#4a2a2a', imgUrl: 'assets/img/gugli.jpg', img: new Image() },
-        // Ric: all'aperto, a sinistra dello Stadio san vito
-        { id: 5, name: "Ric", role: "Stempiato", text: "Ti aspetto per l’ironman! 😉💪🏽 #HybridAthlete #NoPainNoGain #StayHard #YouVsYou", x: 1040, y: 800, color: '#2a4a2a', imgUrl: 'assets/img/ric.jpeg', img: new Image() },
-        // Pietro: all'aperto, sulla strada grigia verticale, vicino a Ekotekne
+        { id: 5, name: "Ric", role: "Stempiato", text: "Ti aspetto per l’ironman! 😉💪🏽\n#HybridAthlete #NoPainNoGain", x: 1040, y: 800, color: '#2a4a2a', imgUrl: 'assets/img/ric.jpeg', img: new Image() },
         { id: 6, name: "Pietro", role: "Pelato", text: "Meh? Quanti esami ti mancano?", x: 640, y: 920, color: '#3d3d3d', imgUrl: 'assets/img/pietro.jpeg', img: new Image() },
-        // Trande: all'aperto, a destra di Ekotekne
         { id: 7, name: "Trande", role: "Scasciatu", text: "Sirda tene puru fii normali?", x: 1030, y: 950, color: '#1a3c34', imgUrl: 'assets/img/tonio.jpeg', img: new Image() }
     ];
-    npcs.forEach(n => { n.img.crossOrigin="Anonymous"; n.img.src=n.imgUrl; });
+    npcs.forEach(n => { n.img.src=n.imgUrl; });
 
     const rain = [];
     for(let i=0; i<400; i++) rain.push({ x: Math.random()*MAP_WIDTH, y: Math.random()*MAP_HEIGHT, v: 8+Math.random()*4 });
@@ -186,6 +200,7 @@
     }
 
     function handleInteraction() {
+        startAudio(); // Fallback per avvio audio
         if (gameState === 'DIALOG') {
             if (dialogChars >= currentDialog.text.length) { 
                 gameState = 'PLAY'; 
@@ -202,12 +217,9 @@
         });
     }
 
-    // === GESTIONE FINE GIOCO CON IMMAGINE ===
     function handleGameCompletion() {
         gameState = 'END';
-        // Puoi cambiare questa immagine con una tua foto di Dublino
         endImage.src = 'assets/img/umb.png';
-        endImage.crossOrigin = "Anonymous";
         endImage.onload = () => { endImageLoaded = true; };
     }
 
@@ -220,7 +232,6 @@
             if (keys['d']||keys['arrowright']) dx = player.speed;
             
             if(dx!==0 || dy!==0) {
-                if(Math.random()<0.05) playStep();
                 if(!checkCollision(player.x + dx, player.y)) player.x += dx;
                 if(!checkCollision(player.x, player.y + dy)) player.y += dy;
             }
@@ -246,7 +257,6 @@
     function draw() {
         ctx.clearRect(0,0,canvas.width,canvas.height);
         
-        // Disegna la mappa solo se non siamo nella schermata finale
         if (gameState !== 'END') {
             ctx.save(); ctx.translate(-camera.x, -camera.y);
 
@@ -275,49 +285,55 @@
 
             ctx.restore();
 
-            // UI Barra Identità
-            ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(20, 20, 200, 4);
-            ctx.fillStyle = '#fff'; ctx.fillRect(20, 20, (identity/100)*200, 4);
-            ctx.font = '8px "Press Start 2P"'; ctx.fillText(`Identità: ${Math.round(identity)}%`, 20, 40);
+            // UI BARRA
+            ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(20, 20, 200, 6);
+            ctx.fillStyle = '#fff'; ctx.fillRect(20, 20, (identity/100)*200, 6);
+            ctx.font = '8px "Press Start 2P"'; ctx.fillText(`Progressi: ${Math.round(identity)}%`, 20, 42);
 
-            // UI Finestra di Dialogo
+            // DIALOGHI
             if (gameState === 'DIALOG') {
-                ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(50, 430, 700, 140);
-                ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.strokeRect(50, 430, 700, 140);
-                if(currentDialog.img.complete) ctx.drawImage(currentDialog.img, 70, 450, 100, 100);
-                ctx.fillStyle = '#aaa'; ctx.font = '10px "Press Start 2P"'; ctx.fillText(currentDialog.name + " (" + currentDialog.role + ")", 190, 465);
+                ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(50, 410, 700, 160);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(50, 410, 700, 160);
+                
+                if(currentDialog.img.complete) drawImageCover(ctx, currentDialog.img, 70, 430, 120, 120);
+                
+                ctx.fillStyle = '#aaa'; ctx.font = '10px "Press Start 2P"'; 
+                ctx.fillText(currentDialog.name + " (" + currentDialog.role + ")", 210, 440);
+                
                 ctx.fillStyle = '#fff'; ctx.font = '11px "Press Start 2P"';
                 let txt = currentDialog.text.substring(0, Math.floor(dialogChars));
-                let words = txt.split(' '); let line = ''; let yy = 500;
-                words.forEach(w => {
-                    if((line + w).length > 30) { ctx.fillText(line, 190, yy); line = w + ' '; yy+=20; }
-                    else line += w + ' ';
+                let lines = txt.split('\n');
+                let yy = 475;
+                lines.forEach(l => {
+                    let words = l.split(' '); let row = '';
+                    words.forEach(w => {
+                        if((row + w).length > 28) { ctx.fillText(row, 210, yy); row = w + ' '; yy+=22; }
+                        else row += w + ' ';
+                    });
+                    ctx.fillText(row, 210, yy); yy+=22;
                 });
-                ctx.fillText(line, 190, yy);
             }
         } else {
-            // == SCHERMATA FINALE CON IMMAGINE ED EFFETTI ==
-            ctx.fillStyle = '#111'; ctx.fillRect(0,0,800,600);
+            // SCHERMATA FINALE
+            ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0,0,800,600);
             
             if (endImageLoaded) {
-                // Cornice ottone per l'immagine
-                ctx.strokeStyle = '#c5a059'; ctx.lineWidth = 6;
-                ctx.strokeRect(100, 80, 600, 400);
-                ctx.drawImage(endImage, 100, 80, 600, 400);
+                ctx.strokeStyle = '#c5a059'; ctx.lineWidth = 4;
+                ctx.strokeRect(200, 50, 400, 350);
+                drawImageCover(ctx, endImage, 200, 50, 400, 350);
             }
 
             ctx.textAlign='center';
-            // Ombra testo
-            ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.font='22px "Press Start 2P"';
-            ctx.fillText("Alla fine l'ha fatta cu te laurei ah...", 402, 532);
-            // Testo principale
-            ctx.fillStyle='#fff'; ctx.font='22px "Press Start 2P"';
-            ctx.fillText("Alla fine l'ha fatta cu te laurei ah...", 400, 530);
+            ctx.fillStyle='#fff'; ctx.font='16px "Press Start 2P"';
+            ctx.fillText("Alla fine l'ha fatta", 400, 440);
+            ctx.fillText("cu te laurei ah...", 400, 470);
             
-            ctx.fillStyle='#aaa'; ctx.font='12px "Press Start 2P"';
-            ctx.fillText("Se campamu non accetta falliti, quindi torna fallito ☘️✈️", 400, 570);
-            
-            ctx.textAlign='left'; // Reset
+            ctx.fillStyle='#c5a059'; ctx.font='10px "Press Start 2P"';
+            let finalMsg = "Se campamu non accetta falliti,";
+            let finalMsg2 = "quindi torna fallito ☘️✈️";
+            ctx.fillText(finalMsg, 400, 520);
+            ctx.fillText(finalMsg2, 400, 545);
+            ctx.textAlign='left';
         }
     }
 
