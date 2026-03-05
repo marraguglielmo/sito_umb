@@ -9,7 +9,6 @@
         body { background-color: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #e0e0e0; font-family: 'Press Start 2P', monospace, sans-serif; overflow: hidden; touch-action: none; }
         canvas { background-color: #333; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); image-rendering: pixelated; max-width: 100%; max-height: 100vh; object-fit: contain; border-radius: 4px; }
         
-        /* CONTROLLI MOBILE UNIFORMATI */
         #mobile-controls { 
             display: none; 
             position: absolute; 
@@ -24,7 +23,7 @@
         
         .dpad { 
             display: grid; 
-            grid-template-columns: repeat(3, 65px); /* Più grandi e uguali */
+            grid-template-columns: repeat(3, 65px); 
             grid-template-rows: repeat(3, 65px); 
             gap: 5px; 
         }
@@ -41,7 +40,7 @@
             -webkit-user-select: none; 
             backdrop-filter: blur(5px); 
             -webkit-tap-highlight-color: transparent;
-            font-size: 20px; /* Frecce belle grandi */
+            font-size: 20px; 
         }
 
         .dpad-btn:active, .action-btn:active {
@@ -179,19 +178,29 @@
 
     function handleInteraction() {
         if (gameState === 'END') { gameState = 'PLAY'; endShown = true; return; }
+        
         if (gameState === 'DIALOG') {
-            if (dialogChars < currentDialog.text.length) dialogChars = currentDialog.text.length;
-            else {
+            // FIX: Assicura che il confronto sia robusto
+            if (Math.floor(dialogChars) >= currentDialog.text.length) {
                 gameState = 'PLAY'; 
                 if (talkedTo.size >= npcs.length && !endShown) handleGameCompletion();
+            } else {
+                // Se non è finito, lo skippiamo al finale
+                dialogChars = currentDialog.text.length;
             }
             return;
         }
+
         if (gameState === 'PLAY') {
             for (let n of npcs) {
                 if (Math.hypot(player.x - n.x, player.y - n.y) < 70) {
-                    currentDialog = n; dialogChars = 0; gameState = 'DIALOG';
-                    if (!talkedTo.has(n.id)) { talkedTo.add(n.id); identity = (talkedTo.size/npcs.length)*100; }
+                    currentDialog = n; 
+                    dialogChars = 0; // Reset contatore caratteri
+                    gameState = 'DIALOG';
+                    if (!talkedTo.has(n.id)) { 
+                        talkedTo.add(n.id); 
+                        identity = (talkedTo.size / npcs.length) * 100; 
+                    }
                     break;
                 }
             }
@@ -218,7 +227,12 @@
             camera.x = Math.max(0, Math.min(player.x - camera.w/2, MAP_WIDTH - camera.w));
             camera.y = Math.max(0, Math.min(player.y - camera.h/2, MAP_HEIGHT - camera.h));
         }
-        if (gameState === 'DIALOG' && dialogChars < currentDialog.text.length) dialogChars += 0.6;
+        
+        if (gameState === 'DIALOG' && currentDialog) {
+            if (dialogChars < currentDialog.text.length) {
+                dialogChars += 0.8; // Velocità testo leggermente aumentata per stabilità
+            }
+        }
     }
 
     function drawChar(x, y, color, hair, suitcase, isPlayer) {
@@ -261,7 +275,7 @@
             ctx.fillStyle = '#fff'; ctx.font = '9px "Press Start 2P"'; 
             ctx.fillText(`IDENTITA: ${Math.round(identity)}%`, 20, 48);
 
-            if (gameState === 'DIALOG') {
+            if (gameState === 'DIALOG' && currentDialog) {
                 ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(50, 410, 700, 160);
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(50, 410, 700, 160);
                 if(currentDialog.img.complete) drawImageCover(ctx, currentDialog.img, 70, 430, 120, 120);
@@ -269,12 +283,17 @@
                 ctx.fillText(currentDialog.name + " (" + currentDialog.role + ")", 210, 440);
                 
                 ctx.fillStyle = '#fff'; ctx.font = '11px "Press Start 2P"';
+                // FIX: Uso Math.floor per evitare errori di precisione
                 let txt = currentDialog.text.substring(0, Math.floor(dialogChars));
                 let words = txt.split(' ');
                 let line = '', yy = 475;
                 for(let n = 0; n < words.length; n++) {
                     let testLine = line + words[n] + ' ';
-                    if (testLine.length > 25) { ctx.fillText(line, 210, yy); line = words[n] + ' '; yy += 24; }
+                    if (testLine.length > 25) { 
+                        ctx.fillText(line, 210, yy); 
+                        line = words[n] + ' '; 
+                        yy += 24; 
+                    }
                     else line = testLine;
                 }
                 ctx.fillText(line, 210, yy);
