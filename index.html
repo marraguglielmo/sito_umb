@@ -204,20 +204,36 @@
         return false;
     }
 
+    // Aggiungi questa variabile all'inizio con le altre (es. sotto let identity = 0)
+    let endShown = false; 
+
     function handleInteraction() {
         startAudio(); 
+        
+        // Se siamo nella schermata finale, premendo TALK torniamo a giocare
+        if (gameState === 'END') {
+            gameState = 'PLAY';
+            endShown = true; // Segnamo che l'abbiamo già vista per non farla loopare
+            return;
+        }
+
         if (gameState === 'DIALOG') {
             if (dialogChars >= currentDialog.text.length) { 
                 gameState = 'PLAY'; 
-                if (talkedTo.size >= npcs.length) handleGameCompletion();
+                // Attiva la schermata finale solo se non l'abbiamo ancora chiusa
+                if (talkedTo.size >= npcs.length && !endShown) handleGameCompletion();
             } else dialogChars = currentDialog.text.length;
             return;
         }
+
         npcs.forEach(n => {
             let d = Math.hypot(player.x - n.x, player.y - n.y);
-            if (d < 65) { // Range aumentato per facilità mobile
+            if (d < 65) {
                 gameState = 'DIALOG'; currentDialog = n; dialogChars = 0;
-                if (!talkedTo.has(n.id)) { talkedTo.add(n.id); identity = (talkedTo.size/npcs.length)*100; }
+                if (!talkedTo.has(n.id)) { 
+                    talkedTo.add(n.id); 
+                    identity = (talkedTo.size/npcs.length)*100; 
+                }
             }
         });
     }
