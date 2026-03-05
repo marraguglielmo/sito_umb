@@ -2,75 +2,16 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Umberto: Dublin Bound</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        
-        body {
-            background-color: #1a1a1a;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            color: #e0e0e0;
-            font-family: 'Press Start 2P', monospace, sans-serif;
-            overflow: hidden;
-            touch-action: none;
-        }
-        
-        canvas {
-            background-color: #333;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            image-rendering: pixelated;
-            max-width: 100%;
-            max-height: 100vh;
-            object-fit: contain;
-            border-radius: 4px;
-        }
-
-        #mobile-controls {
-            display: none;
-            position: absolute;
-            bottom: 30px;
-            width: 100%;
-            padding: 0 25px;
-            box-sizing: border-box;
-            justify-content: space-between;
-            z-index: 10;
-        }
-
-        .dpad {
-            display: grid;
-            grid-template-columns: repeat(3, 50px);
-            grid-template-rows: repeat(3, 50px);
-            gap: 10px;
-        }
-
-        .dpad-btn, .action-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            user-select: none;
-            -webkit-user-select: none;
-            backdrop-filter: blur(5px);
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .action-btn {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            font-size: 14px;
-            background: rgba(255, 255, 255, 0.1);
-        }
-
+        body { background-color: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #e0e0e0; font-family: 'Press Start 2P', monospace, sans-serif; overflow: hidden; touch-action: none; }
+        canvas { background-color: #333; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); image-rendering: pixelated; max-width: 100%; max-height: 100vh; object-fit: contain; border-radius: 4px; }
+        #mobile-controls { display: none; position: absolute; bottom: 30px; width: 100%; padding: 0 25px; box-sizing: border-box; justify-content: space-between; z-index: 10; }
+        .dpad { display: grid; grid-template-columns: repeat(3, 55px); grid-template-rows: repeat(3, 55px); gap: 8px; }
+        .dpad-btn, .action-btn { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 10px; color: white; display: flex; justify-content: center; align-items: center; user-select: none; -webkit-user-select: none; backdrop-filter: blur(5px); -webkit-tap-highlight-color: transparent; }
+        .action-btn { width: 90px; height: 90px; border-radius: 50%; font-size: 14px; background: rgba(255, 255, 255, 0.2); }
         @media (max-width: 850px) { #mobile-controls { display: flex; } }
     </style>
 </head>
@@ -141,9 +82,16 @@
     const bindT = (id, k, act=false) => {
         const b = document.getElementById(id);
         b.addEventListener('touchstart', (e) => { 
-            e.preventDefault(); startAudio(); keys[k]=true; if(act) handleInteraction(); 
-        });
-        b.addEventListener('touchend', (e) => { e.preventDefault(); keys[k]=false; });
+            e.preventDefault(); 
+            e.stopPropagation(); // Blocca click fantasma
+            startAudio(); 
+            keys[k]=true; 
+            if(act) handleInteraction(); 
+        }, {passive: false});
+        b.addEventListener('touchend', (e) => { 
+            e.preventDefault(); 
+            keys[k]=false; 
+        }, {passive: false});
     };
     bindT('btn-up','w'); bindT('btn-left','a'); bindT('btn-down','s'); bindT('btn-right','d'); bindT('btn-action',' ',true);
 
@@ -166,16 +114,16 @@
     const npcs = [
         { id: 1, name: "Cece", role: "Cece", text: "Dovevi aspettarmi bastardo.", x: 420, y: 350, color: '#4a5d23', imgUrl: 'assets/img/cece.jpeg', img: new Image() },
         { id: 2, name: "Aniceto", role: "Rachitico", text: "Ancora quai stai?? Essi o te scannu.", x: 650, y: 310, color: '#5d4a3a', imgUrl: 'assets/img/aniceto.jpeg', img: new Image() },
-        { id: 3, name: "Bubi", role: "Chill guy", text: "Come sta Asia? ….va mori …ammazzati ...sei un pagliaccio ... non ti vergnogni?", x: 1210, y: 350, color: '#2a3d4a', imgUrl: 'assets/img/bubi.jpg', img: new Image() },
-        { id: 4, name: "Gugli", role: "Quasi pelato", text: "Mercoledì in pist... ah no, va fatica.", x: 570, y: 720, color: '#4a2a2a', imgUrl: 'assets/img/gugli.jpg', img: new Image() },
-        { id: 5, name: "Ric", role: "Stempiato", text: "Ti aspetto per l’ironman! 😉💪🏽\n#HybridAthlete #NoPainNoGain", x: 1040, y: 800, color: '#2a4a2a', imgUrl: 'assets/img/ric.jpeg', img: new Image() },
+        { id: 3, name: "Bubi", role: "Chill guy", text: "Come sta Asia? ....va mori ....ammazzati ....sei un pagliaccio .... non ti vergogni?", x: 1210, y: 350, color: '#2a3d4a', imgUrl: 'assets/img/bubi.jpg', img: new Image() },
+        { id: 4, name: "Gugli", role: "Quasi pelato", text: "Mercoledi in pist... ah no, va fatica.", x: 570, y: 720, color: '#4a2a2a', imgUrl: 'assets/img/gugli.jpg', img: new Image() },
+        { id: 5, name: "Ric", role: "Stempiato", text: "Ti aspetto per l'ironman! ;) #HybridAthlete #NoPainNoGain", x: 1040, y: 800, color: '#2a4a2a', imgUrl: 'assets/img/ric.jpeg', img: new Image() },
         { id: 6, name: "Pietro", role: "Pelato", text: "Meh? Quanti esami ti mancano?", x: 640, y: 920, color: '#3d3d3d', imgUrl: 'assets/img/pietro.jpeg', img: new Image() },
         { id: 7, name: "Trande", role: "Scasciatu", text: "Sirda tene puru fii normali?", x: 1030, y: 950, color: '#1a3c34', imgUrl: 'assets/img/tonio.jpeg', img: new Image() }
     ];
     npcs.forEach(n => { n.img.src=n.imgUrl; });
 
     const rain = [];
-    for(let i=0; i<200; i++) rain.push({ x: Math.random()*MAP_WIDTH, y: Math.random()*MAP_HEIGHT, v: 8+Math.random()*4 });
+    for(let i=0; i<150; i++) rain.push({ x: Math.random()*MAP_WIDTH, y: Math.random()*MAP_HEIGHT, v: 8+Math.random()*4 });
 
     function checkCollision(nx, ny) {
         if (nx < 0 || ny < 0 || nx + 32 > MAP_WIDTH || ny + 42 > MAP_HEIGHT) return true;
@@ -185,21 +133,35 @@
     }
 
     function handleInteraction() {
-        startAudio(); 
         if (gameState === 'END') { gameState = 'PLAY'; endShown = true; return; }
+        
         if (gameState === 'DIALOG') {
-            if (dialogChars >= currentDialog.text.length) { 
+            // Se il testo sta ancora scorrendo, lo completiamo subito
+            if (dialogChars < currentDialog.text.length) {
+                dialogChars = currentDialog.text.length;
+            } else {
+                // Se è già completo, chiudiamo il dialogo
                 gameState = 'PLAY'; 
                 if (talkedTo.size >= npcs.length && !endShown) handleGameCompletion();
-            } else dialogChars = currentDialog.text.length;
+            }
             return;
         }
-        npcs.forEach(n => {
-            if (Math.hypot(player.x - n.x, player.y - n.y) < 65) {
-                gameState = 'DIALOG'; currentDialog = n; dialogChars = 0;
-                if (!talkedTo.has(n.id)) { talkedTo.add(n.id); identity = (talkedTo.size/npcs.length)*100; }
+
+        // Se siamo in PLAY, cerchiamo NPC vicini
+        if (gameState === 'PLAY') {
+            for (let n of npcs) {
+                if (Math.hypot(player.x - n.x, player.y - n.y) < 70) {
+                    currentDialog = n;
+                    dialogChars = 0;
+                    gameState = 'DIALOG';
+                    if (!talkedTo.has(n.id)) { 
+                        talkedTo.add(n.id); 
+                        identity = (talkedTo.size/npcs.length)*100; 
+                    }
+                    break;
+                }
             }
-        });
+        }
     }
 
     function handleGameCompletion() {
@@ -222,7 +184,9 @@
             camera.x = Math.max(0, Math.min(player.x - camera.w/2, MAP_WIDTH - camera.w));
             camera.y = Math.max(0, Math.min(player.y - camera.h/2, MAP_HEIGHT - camera.h));
         }
-        if (gameState === 'DIALOG' && dialogChars < currentDialog.text.length) dialogChars += 0.8;
+        if (gameState === 'DIALOG' && dialogChars < currentDialog.text.length) {
+            dialogChars += 0.6; // Più lento e stabile
+        }
     }
 
     function drawChar(x, y, color, hair, suitcase, isPlayer) {
@@ -258,42 +222,36 @@
             });
             ctx.restore();
 
-            // Cerca questa parte dentro la funzione draw() e sostituiscila:
-
-    // UI BARRA PROGRESSI
-    ctx.fillStyle = 'rgba(255,255,255,0.1)'; 
-    ctx.fillRect(20, 20, 200, 10); // Barra sfondo
-    
-    ctx.fillStyle = '#fff'; 
-    ctx.fillRect(20, 20, (identity/100)*200, 10); // Caricamento
-    
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(20, 20, 200, 10); // Bordo barra
-
-    ctx.fillStyle = '#fff'; 
-    ctx.font = '9px "Press Start 2P"'; 
-    // Ho aggiunto "IDENTITÀ:" qui sotto
-    ctx.fillText(`IDENTITÀ: ${Math.round(identity)}%`, 20, 48);
+            // UI BARRA
+            ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(20, 20, 200, 10);
+            ctx.fillStyle = '#fff'; ctx.fillRect(20, 20, (identity/100)*200, 10);
+            ctx.strokeStyle = '#fff'; ctx.strokeRect(20, 20, 200, 10);
+            ctx.fillStyle = '#fff'; ctx.font = '9px "Press Start 2P"'; 
+            ctx.fillText(`IDENTITA: ${Math.round(identity)}%`, 20, 48);
 
             if (gameState === 'DIALOG') {
                 ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(50, 410, 700, 160);
-                ctx.strokeStyle = '#fff'; ctx.strokeRect(50, 410, 700, 160);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(50, 410, 700, 160);
                 if(currentDialog.img.complete) drawImageCover(ctx, currentDialog.img, 70, 430, 120, 120);
-                ctx.fillStyle = '#aaa'; ctx.font = '10px "Press Start 2P"'; ctx.fillText(currentDialog.name + " (" + currentDialog.role + ")", 210, 440);
-                ctx.fillStyle = '#fff'; ctx.font = '11px "Press Start 2P"';
+                ctx.fillStyle = '#aaa'; ctx.font = '10px "Press Start 2P"'; 
+                ctx.fillText(currentDialog.name + " (" + currentDialog.role + ")", 210, 440);
                 
-                let fullTxt = currentDialog.text.substring(0, Math.floor(dialogChars));
-                let paragraphs = fullTxt.split('\n');
-                let yy = 475;
-                paragraphs.forEach(p => {
-                    let words = p.split(' '), line = '';
-                    words.forEach(w => {
-                        if((line + w).length > 26) { ctx.fillText(line, 210, yy); line = w + ' '; yy += 22; }
-                        else line += w + ' ';
-                    });
-                    ctx.fillText(line, 210, yy); yy += 22;
-                });
+                // LOGICA WRAP TESTO CORRETTA
+                ctx.fillStyle = '#fff'; ctx.font = '11px "Press Start 2P"';
+                let txt = currentDialog.text.substring(0, Math.floor(dialogChars));
+                let words = txt.split(' ');
+                let line = '', yy = 475;
+                for(let n = 0; n < words.length; n++) {
+                    let testLine = line + words[n] + ' ';
+                    if (testLine.length > 25) { // Limite caratteri fisso per riga
+                        ctx.fillText(line, 210, yy);
+                        line = words[n] + ' ';
+                        yy += 24;
+                    } else {
+                        line = testLine;
+                    }
+                }
+                ctx.fillText(line, 210, yy);
             }
         } else {
             ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0,0,800,600);
@@ -303,7 +261,7 @@
             ctx.fillText("cu te laurei ah...", 400, 470);
             ctx.fillStyle='#c5a059'; ctx.font='10px "Press Start 2P"';
             ctx.fillText("Se campamu non accetta falliti, quindi torna fallito ☘️✈️", 400, 520);
-            ctx.font='8px "Press Start 2P"'; ctx.fillText("PREMI TALK PER TORNARE IN CITTÀ", 400, 560);
+            ctx.font='8px "Press Start 2P"'; ctx.fillText("PREMI TALK PER TORNARE IN CITTA", 400, 560);
             ctx.textAlign='left';
         }
     }
