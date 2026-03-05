@@ -8,10 +8,55 @@
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         body { background-color: #1a1a1a; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #e0e0e0; font-family: 'Press Start 2P', monospace, sans-serif; overflow: hidden; touch-action: none; }
         canvas { background-color: #333; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); image-rendering: pixelated; max-width: 100%; max-height: 100vh; object-fit: contain; border-radius: 4px; }
-        #mobile-controls { display: none; position: absolute; bottom: 30px; width: 100%; padding: 0 25px; box-sizing: border-box; justify-content: space-between; z-index: 10; }
-        .dpad { display: grid; grid-template-columns: repeat(3, 55px); grid-template-rows: repeat(3, 55px); gap: 8px; }
-        .dpad-btn, .action-btn { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 10px; color: white; display: flex; justify-content: center; align-items: center; user-select: none; -webkit-user-select: none; backdrop-filter: blur(5px); -webkit-tap-highlight-color: transparent; }
-        .action-btn { width: 90px; height: 90px; border-radius: 50%; font-size: 14px; background: rgba(255, 255, 255, 0.2); }
+        
+        /* CONTROLLI MOBILE UNIFORMATI */
+        #mobile-controls { 
+            display: none; 
+            position: absolute; 
+            bottom: 40px; 
+            width: 100%; 
+            padding: 0 20px; 
+            box-sizing: border-box; 
+            justify-content: space-between; 
+            align-items: flex-end;
+            z-index: 10; 
+        }
+        
+        .dpad { 
+            display: grid; 
+            grid-template-columns: repeat(3, 65px); /* Più grandi e uguali */
+            grid-template-rows: repeat(3, 65px); 
+            gap: 5px; 
+        }
+        
+        .dpad-btn, .action-btn { 
+            background: rgba(255, 255, 255, 0.15); 
+            border: 2px solid rgba(255, 255, 255, 0.3); 
+            border-radius: 12px; 
+            color: white; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            user-select: none; 
+            -webkit-user-select: none; 
+            backdrop-filter: blur(5px); 
+            -webkit-tap-highlight-color: transparent;
+            font-size: 20px; /* Frecce belle grandi */
+        }
+
+        .dpad-btn:active, .action-btn:active {
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(0.95);
+        }
+        
+        .action-btn { 
+            width: 100px; 
+            height: 100px; 
+            border-radius: 50%; 
+            font-size: 12px; 
+            background: rgba(255, 255, 255, 0.2); 
+        }
+        
         @media (max-width: 850px) { #mobile-controls { display: flex; } }
     </style>
 </head>
@@ -83,7 +128,7 @@
         const b = document.getElementById(id);
         b.addEventListener('touchstart', (e) => { 
             e.preventDefault(); 
-            e.stopPropagation(); // Blocca click fantasma
+            e.stopPropagation();
             startAudio(); 
             keys[k]=true; 
             if(act) handleInteraction(); 
@@ -113,7 +158,7 @@
 
     const npcs = [
         { id: 1, name: "Cece", role: "Cece", text: "Dovevi aspettarmi bastardo.", x: 420, y: 350, color: '#4a5d23', imgUrl: 'assets/img/cece.jpeg', img: new Image() },
-        { id: 2, name: "Aniceto", role: "Rachitico", text: "Ancora quai stai?? Essi o te scannu.", x: 650, y: 310, color: '#5d4a3a', imgUrl: 'assets/img/aniceto.jpeg', img: new Image() },
+        { id: 2, name: "Aniceto", role: "Rachitico", text: "Ancore quai stai?? Essi o te scannu.", x: 650, y: 310, color: '#5d4a3a', imgUrl: 'assets/img/aniceto.jpeg', img: new Image() },
         { id: 3, name: "Bubi", role: "Chill guy", text: "Come sta Asia? ....va mori ....ammazzati ....sei un pagliaccio .... non ti vergogni?", x: 1210, y: 350, color: '#2a3d4a', imgUrl: 'assets/img/bubi.jpg', img: new Image() },
         { id: 4, name: "Gugli", role: "Quasi pelato", text: "Mercoledi in pist... ah no, va fatica.", x: 570, y: 720, color: '#4a2a2a', imgUrl: 'assets/img/gugli.jpg', img: new Image() },
         { id: 5, name: "Ric", role: "Stempiato", text: "Ti aspetto per l'ironman! ;) #HybridAthlete #NoPainNoGain", x: 1040, y: 800, color: '#2a4a2a', imgUrl: 'assets/img/ric.jpeg', img: new Image() },
@@ -134,30 +179,19 @@
 
     function handleInteraction() {
         if (gameState === 'END') { gameState = 'PLAY'; endShown = true; return; }
-        
         if (gameState === 'DIALOG') {
-            // Se il testo sta ancora scorrendo, lo completiamo subito
-            if (dialogChars < currentDialog.text.length) {
-                dialogChars = currentDialog.text.length;
-            } else {
-                // Se è già completo, chiudiamo il dialogo
+            if (dialogChars < currentDialog.text.length) dialogChars = currentDialog.text.length;
+            else {
                 gameState = 'PLAY'; 
                 if (talkedTo.size >= npcs.length && !endShown) handleGameCompletion();
             }
             return;
         }
-
-        // Se siamo in PLAY, cerchiamo NPC vicini
         if (gameState === 'PLAY') {
             for (let n of npcs) {
                 if (Math.hypot(player.x - n.x, player.y - n.y) < 70) {
-                    currentDialog = n;
-                    dialogChars = 0;
-                    gameState = 'DIALOG';
-                    if (!talkedTo.has(n.id)) { 
-                        talkedTo.add(n.id); 
-                        identity = (talkedTo.size/npcs.length)*100; 
-                    }
+                    currentDialog = n; dialogChars = 0; gameState = 'DIALOG';
+                    if (!talkedTo.has(n.id)) { talkedTo.add(n.id); identity = (talkedTo.size/npcs.length)*100; }
                     break;
                 }
             }
@@ -184,9 +218,7 @@
             camera.x = Math.max(0, Math.min(player.x - camera.w/2, MAP_WIDTH - camera.w));
             camera.y = Math.max(0, Math.min(player.y - camera.h/2, MAP_HEIGHT - camera.h));
         }
-        if (gameState === 'DIALOG' && dialogChars < currentDialog.text.length) {
-            dialogChars += 0.6; // Più lento e stabile
-        }
+        if (gameState === 'DIALOG' && dialogChars < currentDialog.text.length) dialogChars += 0.6;
     }
 
     function drawChar(x, y, color, hair, suitcase, isPlayer) {
@@ -222,7 +254,7 @@
             });
             ctx.restore();
 
-            // UI BARRA
+            // UI
             ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(20, 20, 200, 10);
             ctx.fillStyle = '#fff'; ctx.fillRect(20, 20, (identity/100)*200, 10);
             ctx.strokeStyle = '#fff'; ctx.strokeRect(20, 20, 200, 10);
@@ -236,20 +268,14 @@
                 ctx.fillStyle = '#aaa'; ctx.font = '10px "Press Start 2P"'; 
                 ctx.fillText(currentDialog.name + " (" + currentDialog.role + ")", 210, 440);
                 
-                // LOGICA WRAP TESTO CORRETTA
                 ctx.fillStyle = '#fff'; ctx.font = '11px "Press Start 2P"';
                 let txt = currentDialog.text.substring(0, Math.floor(dialogChars));
                 let words = txt.split(' ');
                 let line = '', yy = 475;
                 for(let n = 0; n < words.length; n++) {
                     let testLine = line + words[n] + ' ';
-                    if (testLine.length > 25) { // Limite caratteri fisso per riga
-                        ctx.fillText(line, 210, yy);
-                        line = words[n] + ' ';
-                        yy += 24;
-                    } else {
-                        line = testLine;
-                    }
+                    if (testLine.length > 25) { ctx.fillText(line, 210, yy); line = words[n] + ' '; yy += 24; }
+                    else line = testLine;
                 }
                 ctx.fillText(line, 210, yy);
             }
