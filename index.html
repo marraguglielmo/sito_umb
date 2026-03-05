@@ -18,7 +18,6 @@
             color: #e0e0e0;
             font-family: 'Press Start 2P', monospace, sans-serif;
             overflow: hidden;
-            /* Impedisce lo scroll accidentale su mobile */
             touch-action: none;
         }
         
@@ -30,17 +29,6 @@
             max-height: 100vh;
             object-fit: contain;
             border-radius: 4px;
-        }
-
-        #info {
-            position: absolute;
-            top: 15px;
-            font-family: sans-serif;
-            font-size: 11px;
-            letter-spacing: 1px;
-            color: #666;
-            text-transform: uppercase;
-            z-index: 10;
         }
 
         #mobile-controls {
@@ -83,15 +71,11 @@
             background: rgba(255, 255, 255, 0.1);
         }
 
-        @media (max-width: 850px) {
-            #mobile-controls { display: flex; }
-            #info { display: none; }
-        }
+        @media (max-width: 850px) { #mobile-controls { display: flex; } }
     </style>
 </head>
 <body onclick="startAudio()">
 
-<div id="info">Tocca per iniziare e usa WASD o Frecce per muoverti</div>
 <canvas id="gameCanvas" width="800" height="600"></canvas>
 
 <div id="mobile-controls">
@@ -108,16 +92,14 @@
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
 
-    // AUDIO SYSTEM
     let bgMusic = new Audio('assets/audio/umb_gay.mp3');
     bgMusic.loop = true;
     let audioStarted = false;
 
     function startAudio() {
         if (!audioStarted) {
-            bgMusic.play().catch(e => console.log("Audio in attesa di interazione"));
+            bgMusic.play().catch(() => {});
             audioStarted = true;
-            document.getElementById('info').innerText = "Esplora la città prima della partenza";
         }
     }
 
@@ -127,6 +109,7 @@
 
     let gameState = 'PLAY'; 
     let identity = 0; 
+    let endShown = false;
     const talkedTo = new Set();
     let currentDialog = null;
     let dialogChars = 0;
@@ -158,10 +141,7 @@
     const bindT = (id, k, act=false) => {
         const b = document.getElementById(id);
         b.addEventListener('touchstart', (e) => { 
-            e.preventDefault(); 
-            startAudio(); 
-            keys[k]=true; 
-            if(act) handleInteraction(); 
+            e.preventDefault(); startAudio(); keys[k]=true; if(act) handleInteraction(); 
         });
         b.addEventListener('touchend', (e) => { e.preventDefault(); keys[k]=false; });
     };
@@ -204,36 +184,20 @@
         return false;
     }
 
-    // Aggiungi questa variabile all'inizio con le altre (es. sotto let identity = 0)
-    let endShown = false; 
-
     function handleInteraction() {
         startAudio(); 
-        
-        // Se siamo nella schermata finale, premendo TALK torniamo a giocare
-        if (gameState === 'END') {
-            gameState = 'PLAY';
-            endShown = true; // Segnamo che l'abbiamo già vista per non farla loopare
-            return;
-        }
-
+        if (gameState === 'END') { gameState = 'PLAY'; endShown = true; return; }
         if (gameState === 'DIALOG') {
             if (dialogChars >= currentDialog.text.length) { 
                 gameState = 'PLAY'; 
-                // Attiva la schermata finale solo se non l'abbiamo ancora chiusa
                 if (talkedTo.size >= npcs.length && !endShown) handleGameCompletion();
             } else dialogChars = currentDialog.text.length;
             return;
         }
-
         npcs.forEach(n => {
-            let d = Math.hypot(player.x - n.x, player.y - n.y);
-            if (d < 65) {
+            if (Math.hypot(player.x - n.x, player.y - n.y) < 65) {
                 gameState = 'DIALOG'; currentDialog = n; dialogChars = 0;
-                if (!talkedTo.has(n.id)) { 
-                    talkedTo.add(n.id); 
-                    identity = (talkedTo.size/npcs.length)*100; 
-                }
+                if (!talkedTo.has(n.id)) { talkedTo.add(n.id); identity = (talkedTo.size/npcs.length)*100; }
             }
         });
     }
@@ -251,15 +215,12 @@
             if (keys['s']||keys['arrowdown']) dy = player.speed;
             if (keys['a']||keys['arrowleft']) dx = -player.speed;
             if (keys['d']||keys['arrowright']) dx = player.speed;
-            
             if(dx!==0 || dy!==0) {
                 if(!checkCollision(player.x + dx, player.y)) player.x += dx;
                 if(!checkCollision(player.x, player.y + dy)) player.y += dy;
             }
-            camera.x = player.x - camera.w/2;
-            camera.y = player.y - camera.h/2;
-            camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - camera.w));
-            camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - camera.h));
+            camera.x = Math.max(0, Math.min(player.x - camera.w/2, MAP_WIDTH - camera.w));
+            camera.y = Math.max(0, Math.min(player.y - camera.h/2, MAP_HEIGHT - camera.h));
         }
         if (gameState === 'DIALOG' && dialogChars < currentDialog.text.length) dialogChars += 0.8;
     }
@@ -271,96 +232,78 @@
         ctx.fillStyle = color; ctx.fillRect(x+4, y+12, 24, 22);
         ctx.fillStyle = '#efd0b1'; ctx.fillRect(x+8, y, 16, 16);
         ctx.fillStyle = hair; ctx.fillRect(x+8, y, 16, 4);
-        if(isPlayer) { ctx.fillStyle = suitcase; ctx.fillRect(x+26, y+24, 10, 14); ctx.fillStyle='#111'; ctx.fillRect(x+28, y+22, 6, 2); }
+        if(isPlayer) { 
+            ctx.fillStyle = suitcase; ctx.fillRect(x+26, y+24, 10, 14); 
+            ctx.fillStyle='#111'; ctx.fillRect(x+28, y+22, 6, 2); 
+        }
         ctx.fillStyle = '#333'; ctx.fillRect(x+10, y+6, 3, 3); ctx.fillRect(x+19, y+6, 3, 3);
     }
 
     function draw() {
         ctx.clearRect(0,0,canvas.width,canvas.height);
-        
         if (gameState !== 'END') {
             ctx.save(); ctx.translate(-camera.x, -camera.y);
-
             ctx.fillStyle = '#2a2a2a'; ctx.fillRect(0,0,MAP_WIDTH,MAP_HEIGHT);
-            ctx.strokeStyle = '#333'; ctx.lineWidth=1;
-            for(let i=0; i<MAP_WIDTH; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,MAP_HEIGHT); ctx.stroke(); }
-
             roads.forEach(r => { ctx.fillStyle=r.color; ctx.fillRect(r.x,r.y,r.w,r.h); });
-
             obstacles.forEach(o => {
                 ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, o.w, o.h);
-                ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(o.x, o.y+o.h-10, o.w, 10);
-                ctx.fillStyle = '#fff'; ctx.font = '10px "Press Start 2P"';
-                ctx.fillText(o.label, o.x+15, o.y+30);
+                ctx.fillStyle = '#fff'; ctx.font = '10px "Press Start 2P"'; ctx.fillText(o.label, o.x+15, o.y+30);
             });
-
             npcs.forEach(n => drawChar(n.x, n.y, n.color, '#333', '', false));
             drawChar(player.x, player.y, player.color, player.hair, player.suitcase, true);
-
-            ctx.strokeStyle = 'rgba(200,200,255,0.2)'; ctx.lineWidth=1;
+            ctx.strokeStyle = 'rgba(200,200,255,0.2)';
             rain.forEach(r => {
                 ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x-1, r.y+5); ctx.stroke();
-                r.y += r.v; r.x -= 0.5;
-                if(r.y > MAP_HEIGHT) { r.y = -10; r.x = Math.random()*MAP_WIDTH; }
+                r.y += r.v; if(r.y > MAP_HEIGHT) r.y = -10;
             });
-
             ctx.restore();
 
-            // UI BARRA
-            ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(20, 20, 200, 6);
-            ctx.fillStyle = '#fff'; ctx.fillRect(20, 20, (identity/100)*200, 6);
-            ctx.font = '8px "Press Start 2P"'; ctx.fillText(`Progressi: ${Math.round(identity)}%`, 20, 42);
+            // Cerca questa parte dentro la funzione draw() e sostituiscila:
 
-            // DIALOGHI - LOGICA WRAP SICURA PER MOBILE
+    // UI BARRA PROGRESSI
+    ctx.fillStyle = 'rgba(255,255,255,0.1)'; 
+    ctx.fillRect(20, 20, 200, 10); // Barra sfondo
+    
+    ctx.fillStyle = '#fff'; 
+    ctx.fillRect(20, 20, (identity/100)*200, 10); // Caricamento
+    
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(20, 20, 200, 10); // Bordo barra
+
+    ctx.fillStyle = '#fff'; 
+    ctx.font = '9px "Press Start 2P"'; 
+    // Ho aggiunto "IDENTITÀ:" qui sotto
+    ctx.fillText(`IDENTITÀ: ${Math.round(identity)}%`, 20, 48);
+
             if (gameState === 'DIALOG') {
                 ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(50, 410, 700, 160);
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(50, 410, 700, 160);
-                
+                ctx.strokeStyle = '#fff'; ctx.strokeRect(50, 410, 700, 160);
                 if(currentDialog.img.complete) drawImageCover(ctx, currentDialog.img, 70, 430, 120, 120);
-                
-                ctx.fillStyle = '#aaa'; ctx.font = '10px "Press Start 2P"'; 
-                ctx.fillText(currentDialog.name + " (" + currentDialog.role + ")", 210, 440);
-                
+                ctx.fillStyle = '#aaa'; ctx.font = '10px "Press Start 2P"'; ctx.fillText(currentDialog.name + " (" + currentDialog.role + ")", 210, 440);
                 ctx.fillStyle = '#fff'; ctx.font = '11px "Press Start 2P"';
                 
-                // --- NUOVA LOGICA DI WRAP SICURA ---
                 let fullTxt = currentDialog.text.substring(0, Math.floor(dialogChars));
                 let paragraphs = fullTxt.split('\n');
                 let yy = 475;
-                const maxLineW = 26; // Caratteri per riga sicuri
-
                 paragraphs.forEach(p => {
-                    let words = p.split(' ');
-                    let line = '';
-                    for(let i=0; i<words.length; i++) {
-                        let testLine = line + words[i] + ' ';
-                        if (testLine.length > maxLineW && i > 0) {
-                            ctx.fillText(line, 210, yy);
-                            line = words[i] + ' ';
-                            yy += 22;
-                        } else {
-                            line = testLine;
-                        }
-                    }
-                    ctx.fillText(line, 210, yy);
-                    yy += 22;
+                    let words = p.split(' '), line = '';
+                    words.forEach(w => {
+                        if((line + w).length > 26) { ctx.fillText(line, 210, yy); line = w + ' '; yy += 22; }
+                        else line += w + ' ';
+                    });
+                    ctx.fillText(line, 210, yy); yy += 22;
                 });
             }
         } else {
-            // SCHERMATA FINALE
             ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0,0,800,600);
-            if (endImageLoaded) {
-                ctx.strokeStyle = '#c5a059'; ctx.lineWidth = 4;
-                ctx.strokeRect(200, 50, 400, 350);
-                drawImageCover(ctx, endImage, 200, 50, 400, 350);
-            }
-            ctx.textAlign='center';
-            ctx.fillStyle='#fff'; ctx.font='16px "Press Start 2P"';
+            if (endImageLoaded) drawImageCover(ctx, endImage, 200, 50, 400, 350);
+            ctx.textAlign='center'; ctx.fillStyle='#fff'; ctx.font='16px "Press Start 2P"';
             ctx.fillText("Alla fine l'ha fatta", 400, 440);
             ctx.fillText("cu te laurei ah...", 400, 470);
             ctx.fillStyle='#c5a059'; ctx.font='10px "Press Start 2P"';
-            ctx.fillText("Se campamu non accetta falliti,", 400, 520);
-            ctx.fillText("quindi torna fallito ☘️✈️", 400, 545);
+            ctx.fillText("Se campamu non accetta falliti, quindi torna fallito ☘️✈️", 400, 520);
+            ctx.font='8px "Press Start 2P"'; ctx.fillText("PREMI TALK PER TORNARE IN CITTÀ", 400, 560);
             ctx.textAlign='left';
         }
     }
